@@ -6,7 +6,7 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                git 'https://github.com/Harshavardhana-v/devops-task-manager.git'
+                git  branch: 'main',url:'https://github.com/Harshavardhana-v/devops-task-manager.git'
             }
         }
 
