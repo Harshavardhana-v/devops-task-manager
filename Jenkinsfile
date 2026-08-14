@@ -6,21 +6,30 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                git  branch: 'main',url:'https://github.com/Harshavardhana-v/devops-task-manager.git'
+                git branch: 'main',
+                    url: 'https://github.com/Harshavardhana-v/devops-task-manager.git'
             }
         }
 
-        stage('Build Docker Image') {
-            steps {
-                bat 'docker build -t devops-task-manager .'
-            }
-        }
+        stage('Deploy to AWS EC2') {
 
-        stage('Run Container') {
             steps {
-                bat 'docker stop devops-task-manager || exit 0'
-                bat 'docker rm devops-task-manager || exit 0'
-                bat 'docker run -d --name devops-task-manager -p 5051:80 devops-task-manager'
+
+                withCredentials([
+                    file(
+                        credentialsId: 'aws-ec2-pem',
+                        variable: 'KEYFILE'
+                    )
+                ]) {
+
+                    bat '''
+                        icacls "%KEYFILE%" /inheritance:r
+                        icacls "%KEYFILE%" /remove "BUILTIN\\Users"
+                        icacls "%KEYFILE%" /grant:r "*S-1-5-18:F"
+
+                        ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@43.204.140.215 "cd /home/ubuntu/devops-task-manager && git pull origin main && sudo docker build -t devops-task-manager . && sudo docker stop devops-task-manager || true && sudo docker rm devops-task-manager || true && sudo docker run -d --name devops-task-manager -p 80:80 devops-task-manager"
+                    '''
+                }
             }
         }
     }
