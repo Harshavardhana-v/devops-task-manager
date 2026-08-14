@@ -20,7 +20,7 @@ pipeline {
             steps {
                 bat 'docker stop devops-task-manager || exit 0'
                 bat 'docker rm devops-task-manager || exit 0'
-                bat 'docker run -d --name devops-task-manager -p 5050:80 devops-task-manager'
+                bat 'docker run -d --name devops-task-manager -p 5051:80 devops-task-manager'
             }
         }
     }
