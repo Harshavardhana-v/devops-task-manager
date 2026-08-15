@@ -35,7 +35,7 @@ pipeline {
 
                  powershell -command "Write-Output ('User=' + $env:DOCKER_USERNAME.Length + ' Pass=' + $env:DOCKER_PASSWORD.Length)"
 
-                echo %DOCKER_PASSWORD% | docker login -u %DOCKER_USERNAME% --password-stdin
+                 <nul set /p =%DOCKER_PASSWORD%| docker login -u %DOCKER_USERNAME% --password-stdin
 
                 if errorlevel 1 (
                     echo Docker Hub login FAILED
