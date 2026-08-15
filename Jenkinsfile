@@ -22,22 +22,40 @@ pipeline {
         }
 
         stage('Push to Docker Hub') {
-            steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'dockerhub-creds',
-                        usernameVariable: 'DOCKER_USERNAME',
-                        passwordVariable: 'DOCKER_PASSWORD'
-                    )
-                ]) {
-                    bat '''
-                        echo %DOCKER_PASSWORD% | docker login -u %DOCKER_USERNAME% --password-stdin
-                        docker push %IMAGE_NAME%
-                        docker logout
-                    '''
-                }
-            }
+    steps {
+        withCredentials([
+            usernamePassword(
+                credentialsId: 'dockerhub-creds',
+                usernameVariable: 'DOCKER_USERNAME',
+                passwordVariable: 'DOCKER_PASSWORD'
+            )
+        ]) {
+            bat '''
+                echo Logging into Docker Hub...
+
+                echo %DOCKER_PASSWORD% | docker login -u %DOCKER_USERNAME% --password-stdin
+
+                if errorlevel 1 (
+                    echo Docker Hub login FAILED
+                    exit /b 1
+                )
+
+                echo Docker Hub login SUCCESSFUL
+
+                docker push %IMAGE_NAME%
+
+                if errorlevel 1 (
+                    echo Docker image push FAILED
+                    exit /b 1
+                )
+
+                echo Docker image push SUCCESSFUL
+
+                docker logout
+            '''
         }
+    }
+}
 
         stage('Deploy to AWS EC2') {
             steps {
