@@ -27,7 +27,7 @@ pipeline {
                         icacls "%KEYFILE%" /remove "BUILTIN\\Users"
                         icacls "%KEYFILE%" /grant:r "*S-1-5-18:F"
 
-                        ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@43.204.140.215 "cd /home/ubuntu/devops-task-manager && git pull origin main && sudo docker build -t devops-task-manager . && sudo docker stop devops-task-manager || true && sudo docker rm devops-task-manager || true && sudo docker run -d --name devops-task-manager -p 80:80 devops-task-manager"
+                        ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.232.32.62 "cd /home/ubuntu/devops-task-manager && git pull origin main && sudo docker build -t devops-task-manager . && sudo docker stop devops-task-manager || true && sudo docker rm devops-task-manager || true && sudo docker run -d --name devops-task-manager -p 80:80 devops-task-manager"
                     '''
                 }
             }
