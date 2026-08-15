@@ -33,6 +33,8 @@ pipeline {
             bat '''
                 echo Logging into Docker Hub...
 
+                 powershell -command "Write-Output ('User=' + $env:DOCKER_USERNAME.Length + ' Pass=' + $env:DOCKER_PASSWORD.Length)"
+
                 echo %DOCKER_PASSWORD% | docker login -u %DOCKER_USERNAME% --password-stdin
 
                 if errorlevel 1 (
