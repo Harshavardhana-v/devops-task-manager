@@ -1,0 +1,8 @@
+services:
+
+   web:
+     build: .
+     container_name: devops-task-manager
+     ports:
+        - "80:80"
+        
