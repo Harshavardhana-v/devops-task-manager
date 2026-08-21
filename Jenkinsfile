@@ -18,7 +18,7 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                bat 'docker build -t %ECR_REPO%:latest .'
+               bat 'docker build --provenance=false --sbom=false -t %ECR_REPO%:latest .'
             }
         }
 
