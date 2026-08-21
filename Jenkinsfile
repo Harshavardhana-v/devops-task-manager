@@ -62,32 +62,83 @@ pipeline {
         }
 
         stage('Deploy to AWS EC2') {
-            steps {
 
-                withCredentials([
-                    file(
-                        credentialsId: 'aws-ec2-pem',
-                        variable: 'KEYFILE'
-                    )
-                ]) {
+    steps {
 
-                    bat '''
-                        echo Deploying to EC2...
+        withCredentials([
+            file(
+                credentialsId: 'aws-ec2-pem',
+                variable: 'KEYFILE'
+            )
+        ]) {
 
-                        ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "cd /home/ubuntu/devops-task-manager && sudo docker compose down || true"
+            bat '''
+                echo ================================
+                echo Preparing SSH key
+                echo ================================
 
-                        ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "sudo docker rm -f devops-task-manager || true"
+                whoami
 
-                        ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "sudo docker pull %ECR_REPO%:latest"
+                icacls "%KEYFILE%" /inheritance:r
+                icacls "%KEYFILE%" /remove "BUILTIN\\Users"
+                icacls "%KEYFILE%" /grant:r "*S-1-5-18:F"
 
-                        ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "sudo docker tag %ECR_REPO%:latest devops-task-manager:latest"
+                echo ================================
+                echo Testing EC2 connection
+                echo ================================
 
-                        ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "sudo docker run -d --name devops-task-manager -p 80:80 devops-task-manager:latest"
+                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "echo EC2 CONNECTION SUCCESSFUL"
 
-                        echo Deployment completed!
-                    '''
-                }
-            }
+                if errorlevel 1 (
+                    echo EC2 SSH CONNECTION FAILED
+                    exit /b 1
+                )
+
+                echo ================================
+                echo Logging into ECR on EC2
+                echo ================================
+
+                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "aws ecr get-login-password --region ap-south-1 | sudo docker login --username AWS --password-stdin 351395891043.dkr.ecr.ap-south-1.amazonaws.com"
+
+                if errorlevel 1 (
+                    echo EC2 ECR LOGIN FAILED
+                    exit /b 1
+                )
+
+                echo ================================
+                echo Removing old container
+                echo ================================
+
+                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "sudo docker rm -f devops-task-manager || true"
+
+                echo ================================
+                echo Pulling latest image
+                echo ================================
+
+                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "sudo docker pull 351395891043.dkr.ecr.ap-south-1.amazonaws.com/devops-task-manager:latest"
+
+                if errorlevel 1 (
+                    echo DOCKER PULL FAILED
+                    exit /b 1
+                )
+
+                echo ================================
+                echo Starting new container
+                echo ================================
+
+                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "sudo docker run -d --name devops-task-manager -p 80:80 351395891043.dkr.ecr.ap-south-1.amazonaws.com/devops-task-manager:latest"
+
+                if errorlevel 1 (
+                    echo DOCKER RUN FAILED
+                    exit /b 1
+                )
+
+                echo ================================
+                echo DEPLOYMENT SUCCESSFUL
+                echo ================================
+            '''
         }
+    }
+}
     }
 }
