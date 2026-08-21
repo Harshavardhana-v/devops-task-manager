@@ -18,44 +18,33 @@ pipeline {
         }
 
         stage('Deploy to AWS EC2') {
-            steps {
+    steps {
+        withCredentials([
+            file(
+                credentialsId: 'aws-ec2-pem',
+                variable: 'KEYFILE'
+            )
+        ]) {
 
-                withCredentials([
-                    file(
-                        credentialsId: 'aws-ec2-pem',
-                        variable: 'KEYFILE'
-                    )
-                ]) {
+            bat """
+                echo Deploying to EC2...
 
-                    bat '''
-                        echo Jenkins account:
-                        whoami
+                echo Creating project directory...
+                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "mkdir -p /home/ubuntu/devops-task-manager"
 
-                        echo Fixing key permissions...
+                echo Copying application files...
+                scp -i "%KEYFILE%" -o StrictHostKeyChecking=no Dockerfile docker-compose.yml index.html script.js style.css ubuntu@13.201.222.207:/home/ubuntu/devops-task-manager/
 
-                        icacls "%KEYFILE%" /inheritance:r
-                        icacls "%KEYFILE%" /remove "BUILTIN\\Users"
-                        icacls "%KEYFILE%" /grant:r "*S-1-5-18:F"
+                echo Stopping old Compose application...
+                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "cd /home/ubuntu/devops-task-manager && sudo docker compose down || true"
 
-                        echo Deploying to EC2...
+                echo Building and starting application...
+                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "cd /home/ubuntu/devops-task-manager && sudo docker compose up -d --build"
 
-                        ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "sudo docker stop devops-task-manager || true && sudo docker rm devops-task-manager || true"
-
-                        echo Copying application to EC2...
-
-                        scp -i "%KEYFILE%" -o StrictHostKeyChecking=no -r . ubuntu@13.201.222.207:/home/ubuntu/devops-task-manager
-
-                        echo Building Docker image on EC2...
-
-                        ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "cd /home/ubuntu/devops-task-manager && sudo docker build -t devops-task-manager ."
-                        echo Starting container...
-
-                        ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "sudo docker run -d --name devops-task-manager -p 80:80 devops-task-manager"
-
-                        echo Deployment completed!
-                    '''
-                }
-            }
+                echo Deployment completed!
+            """
         }
+    }
+      }
     }
 }
