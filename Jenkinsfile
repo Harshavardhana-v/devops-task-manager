@@ -61,7 +61,16 @@ pipeline {
 
                         echo Stopping old Compose application...
 
-                        ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "cd /home/ubuntu/devops-task-manager && sudo docker compose down"
+ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "cd /home/ubuntu/devops-task-manager && sudo docker compose down || true"
+
+echo Removing old container...
+
+ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "sudo docker rm -f devops-task-manager || true"
+
+echo Building and starting application...
+
+ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "cd /home/ubuntu/devops-task-manager && sudo docker compose up -d --build"
+
 
                         if errorlevel 1 (
                             echo DOCKER COMPOSE DOWN FAILED
