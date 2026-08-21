@@ -39,7 +39,7 @@ pipeline {
 
                         echo Deploying to EC2...
 
-                        ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu13.201.222.207 "sudo docker stop devops-task-manager || true && sudo docker rm devops-task-manager || true"
+                        ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "sudo docker stop devops-task-manager || true && sudo docker rm devops-task-manager || true"
 
                         echo Copying application to EC2...
 
