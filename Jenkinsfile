@@ -1,23 +1,4 @@
-pipeline {
-
-    agent any
-
-    stages {
-
-        stage('Checkout') {
-            steps {
-                git branch: 'main',
-                    url: 'https://github.com/Harshavardhana-v/devops-task-manager.git'
-            }
-        }
-
-        stage('Build Docker Image') {
-            steps {
-                bat 'docker build -t devops-task-manager .'
-            }
-        }
-
-        stage('Deploy to AWS EC2') {
+stage('Deploy to AWS EC2') {
     steps {
         withCredentials([
             file(
@@ -27,24 +8,62 @@ pipeline {
         ]) {
 
             bat """
-                echo Deploying to EC2...
+                echo Jenkins account:
+                whoami
+
+                echo Fixing SSH key permissions...
+
+                icacls "%KEYFILE%" /inheritance:r
+                icacls "%KEYFILE%" /remove "BUILTIN\\Users"
+                icacls "%KEYFILE%" /grant:r "*S-1-5-18:F"
+
+                echo Testing EC2 connection...
+
+                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "echo EC2 CONNECTION SUCCESSFUL"
+
+                if errorlevel 1 (
+                    echo EC2 SSH CONNECTION FAILED
+                    exit /b 1
+                )
 
                 echo Creating project directory...
+
                 ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "mkdir -p /home/ubuntu/devops-task-manager"
 
+                if errorlevel 1 (
+                    echo DIRECTORY CREATION FAILED
+                    exit /b 1
+                )
+
                 echo Copying application files...
+
                 scp -i "%KEYFILE%" -o StrictHostKeyChecking=no Dockerfile docker-compose.yml index.html script.js style.css ubuntu@13.201.222.207:/home/ubuntu/devops-task-manager/
 
+                if errorlevel 1 (
+                    echo FILE COPY FAILED
+                    exit /b 1
+                )
+
                 echo Stopping old Compose application...
-                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "cd /home/ubuntu/devops-task-manager && sudo docker compose down || true"
+
+                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "cd /home/ubuntu/devops-task-manager && sudo docker compose down"
+
+                if errorlevel 1 (
+                    echo DOCKER COMPOSE DOWN FAILED
+                    exit /b 1
+                )
 
                 echo Building and starting application...
+
                 ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.201.222.207 "cd /home/ubuntu/devops-task-manager && sudo docker compose up -d --build"
 
-                echo Deployment completed!
+                if errorlevel 1 (
+                    echo DOCKER COMPOSE DEPLOYMENT FAILED
+                    exit /b 1
+                )
+
+                echo Deployment completed successfully!
             """
         }
-    }
-      }
     }
 }
