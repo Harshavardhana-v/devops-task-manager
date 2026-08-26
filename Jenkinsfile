@@ -126,8 +126,7 @@ pipeline {
                 echo Starting new container
                 echo ================================
 
-                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.206.0.202 "sudo docker run -d --name devops-task-manager -p 80:80 351395891043.dkr.ecr.ap-south-1.amazonaws.com/devops-task-manager:latest"
-
+                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@13.206.0.202 "sudo docker run -d --restart unless-stopped --name devops-task-manager -p 80:80 351395891043.dkr.ecr.ap-south-1.amazonaws.com/devops-task-manager:latest"
                 if errorlevel 1 (
                     echo DOCKER RUN FAILED
                     exit /b 1
