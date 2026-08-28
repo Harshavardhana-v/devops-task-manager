@@ -16,6 +16,46 @@ pipeline {
             }
         }
 
+        stage('Terraform Plan') {
+    steps {
+        withCredentials([
+            usernamePassword(
+                credentialsId: 'jenkins-ecr',
+                usernameVariable: 'AWS_ACCESS_KEY_ID',
+                passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+            )
+        ]) {
+            bat '''
+                echo ================================
+                echo Terraform Init
+                echo ================================
+
+                cd /d C:\\Terraform\\devops-infra
+
+                terraform init
+
+                if errorlevel 1 (
+                    echo TERRAFORM INIT FAILED
+                    exit /b 1
+                )
+
+                echo ================================
+                echo Terraform Plan
+                echo ================================
+
+                terraform plan
+
+                if errorlevel 1 (
+                    echo TERRAFORM PLAN FAILED
+                    exit /b 1
+                )
+
+                echo TERRAFORM PLAN SUCCESSFUL
+            '''
+        }
+    }
+}
+
         stage('Build Docker Image') {
             steps {
                 bat 'docker build --provenance=false --sbom=false -t %ECR_REPO%:latest .'
