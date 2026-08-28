@@ -65,12 +65,13 @@ pipeline {
       stage('Get EC2 IP') {
     steps {
         script {
-            EC2_IP = bat(
+          def ec2IP = bat(
                 script: '@cd /d C:\\Terraform\\devops-infra && @terraform output -raw ec2_elastic_ip',
                 returnStdout: true
             ).trim()
+            env.EC2_IP=ec2Ip
 
-            echo "EC2 Elastic IP: ${EC2_IP}"
+            echo "EC2 Elastic IP: ${env.EC2_IP}"
         }
     }
 }
@@ -103,7 +104,7 @@ pipeline {
                 echo Testing EC2 connection
                 echo ================================
 
-                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@${EC2_IP} "echo EC2 CONNECTION SUCCESSFUL"
+                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "echo EC2 CONNECTION SUCCESSFUL"
 
                 if errorlevel 1 (
                     echo EC2 SSH CONNECTION FAILED
@@ -114,7 +115,7 @@ pipeline {
                 echo Logging into ECR on EC2
                 echo ================================
 
-                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@${EC2_IP} "aws ecr get-login-password --region ap-south-1 | sudo docker login --username AWS --password-stdin 351395891043.dkr.ecr.ap-south-1.amazonaws.com"
+                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "aws ecr get-login-password --region ap-south-1 | sudo docker login --username AWS --password-stdin 351395891043.dkr.ecr.ap-south-1.amazonaws.com"
 
                 if errorlevel 1 (
                     echo EC2 ECR LOGIN FAILED
@@ -125,13 +126,13 @@ pipeline {
                 echo Removing old container
                 echo ================================
 
-                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@${EC2_IP} "sudo docker rm -f devops-task-manager || true"
+                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "sudo docker rm -f devops-task-manager || true"
 
                 echo ================================
                 echo Pulling latest image
                 echo ================================
 
-                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@${EC2_IP} "sudo docker pull 351395891043.dkr.ecr.ap-south-1.amazonaws.com/devops-task-manager:latest"
+                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "sudo docker pull 351395891043.dkr.ecr.ap-south-1.amazonaws.com/devops-task-manager:latest"
 
                 if errorlevel 1 (
                     echo DOCKER PULL FAILED
@@ -142,7 +143,7 @@ pipeline {
                 echo Starting new container
                 echo ================================
 
-                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@${EC2_IP} "sudo docker run -d --restart unless-stopped --name devops-task-manager -p 80:80 351395891043.dkr.ecr.ap-south-1.amazonaws.com/devops-task-manager:latest"
+                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "sudo docker run -d --restart unless-stopped --name devops-task-manager -p 80:80 351395891043.dkr.ecr.ap-south-1.amazonaws.com/devops-task-manager:latest"
                 if errorlevel 1 (
                     echo DOCKER RUN FAILED
                     exit /b 1
