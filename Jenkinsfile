@@ -4,8 +4,7 @@ pipeline {
 
     environment {
         AWS_REGION = 'ap-south-1'
-        ECR_REPO = '351395891043.dkr.ecr.ap-south-1.amazonaws.com/devops-task-manager'
-        EC2_IP= ''
+        ECR_REPO   = '351395891043.dkr.ecr.ap-south-1.amazonaws.com/devops-task-manager'
     }
 
     stages {
@@ -19,7 +18,7 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-               bat 'docker build --provenance=false --sbom=false -t %ECR_REPO%:latest .'
+                bat 'docker build --provenance=false --sbom=false -t %ECR_REPO%:latest .'
             }
         }
 
@@ -34,7 +33,9 @@ pipeline {
                 ]) {
 
                     bat '''
-                        echo Logging into AWS ECR...
+                        echo ================================
+                        echo Logging into AWS ECR
+                        echo ================================
 
                         aws configure set aws_access_key_id "%AWS_ACCESS_KEY_ID%"
                         aws configure set aws_secret_access_key "%AWS_SECRET_ACCESS_KEY%"
@@ -47,7 +48,9 @@ pipeline {
                             exit /b 1
                         )
 
-                        echo Pushing Docker image to ECR...
+                        echo ================================
+                        echo Pushing Docker image to ECR
+                        echo ================================
 
                         docker push "%ECR_REPO%:latest"
 
@@ -62,98 +65,126 @@ pipeline {
             }
         }
 
-     stage('Get EC2 IP') {
-    steps {
-        script {
-            env.EC2_IP = bat(
-                script: '@cd /d C:\\Terraform\\devops-infra && @terraform output -raw ec2_elastic_ip',
-                returnStdout: true
-            ).trim()
+        stage('Get EC2 IP') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'jenkins-ecr',
+                        usernameVariable: 'AWS_ACCESS_KEY_ID',
+                        passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                    )
+                ]) {
 
-            echo "EC2 Elastic IP: ${env.EC2_IP}"
+                    script {
+
+                        env.EC2_IP = bat(
+                            script: '''
+                                @set AWS_DEFAULT_REGION=%AWS_REGION%
+                                @set AWS_REGION=%AWS_REGION%
+                                @set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID%
+                                @set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
+
+                                @cd /d C:\\Terraform\\devops-infra
+
+                                @terraform output -raw ec2_elastic_ip
+                            ''',
+                            returnStdout: true
+                        ).trim()
+
+                        echo "EC2 Elastic IP: ${env.EC2_IP}"
+
+                        if (!env.EC2_IP || env.EC2_IP == 'null') {
+                            error("Failed to obtain EC2 Elastic IP from Terraform")
+                        }
+                    }
+                }
+            }
         }
-    }
-}
-
-
 
         stage('Deploy to AWS EC2') {
 
-    steps {
+            steps {
 
-        withCredentials([
-            file(
-                credentialsId: 'aws-ec2-pem',
-                variable: 'KEYFILE'
-            )
-        ]) {
+                withCredentials([
+                    file(
+                        credentialsId: 'aws-ec2-pem',
+                        variable: 'KEYFILE'
+                    )
+                ]) {
 
-            bat '''
-                echo ================================
-                echo Preparing SSH key
-                echo ================================
+                    bat '''
+                        echo ================================
+                        echo Preparing SSH key
+                        echo ================================
 
-                whoami
+                        whoami
 
-                icacls "%KEYFILE%" /inheritance:r
-                icacls "%KEYFILE%" /remove "BUILTIN\\Users"
-                icacls "%KEYFILE%" /grant:r "*S-1-5-18:F"
+                        icacls "%KEYFILE%" /inheritance:r
+                        icacls "%KEYFILE%" /remove "BUILTIN\\Users"
+                        icacls "%KEYFILE%" /grant:r "*S-1-5-18:F"
 
-                echo ================================
-                echo Testing EC2 connection
-                echo ================================
+                        echo ================================
+                        echo EC2 IP
+                        echo ================================
 
-                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "echo EC2 CONNECTION SUCCESSFUL"
+                        echo Deploying to EC2 IP: %EC2_IP%
 
-                if errorlevel 1 (
-                    echo EC2 SSH CONNECTION FAILED
-                    exit /b 1
-                )
+                        echo ================================
+                        echo Testing EC2 connection
+                        echo ================================
 
-                echo ================================
-                echo Logging into ECR on EC2
-                echo ================================
+                        ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "echo EC2 CONNECTION SUCCESSFUL"
 
-                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "aws ecr get-login-password --region ap-south-1 | sudo docker login --username AWS --password-stdin 351395891043.dkr.ecr.ap-south-1.amazonaws.com"
+                        if errorlevel 1 (
+                            echo EC2 SSH CONNECTION FAILED
+                            exit /b 1
+                        )
 
-                if errorlevel 1 (
-                    echo EC2 ECR LOGIN FAILED
-                    exit /b 1
-                )
+                        echo ================================
+                        echo Logging into ECR on EC2
+                        echo ================================
 
-                echo ================================
-                echo Removing old container
-                echo ================================
+                        ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "aws ecr get-login-password --region %AWS_REGION% | sudo docker login --username AWS --password-stdin 351395891043.dkr.ecr.ap-south-1.amazonaws.com"
 
-                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "sudo docker rm -f devops-task-manager || true"
+                        if errorlevel 1 (
+                            echo EC2 ECR LOGIN FAILED
+                            exit /b 1
+                        )
 
-                echo ================================
-                echo Pulling latest image
-                echo ================================
+                        echo ================================
+                        echo Removing old container
+                        echo ================================
 
-                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "sudo docker pull 351395891043.dkr.ecr.ap-south-1.amazonaws.com/devops-task-manager:latest"
+                        ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "sudo docker rm -f devops-task-manager || true"
 
-                if errorlevel 1 (
-                    echo DOCKER PULL FAILED
-                    exit /b 1
-                )
+                        echo ================================
+                        echo Pulling latest image
+                        echo ================================
 
-                echo ================================
-                echo Starting new container
-                echo ================================
+                        ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "sudo docker pull %ECR_REPO%:latest"
 
-                ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "sudo docker run -d --restart unless-stopped --name devops-task-manager -p 80:80 351395891043.dkr.ecr.ap-south-1.amazonaws.com/devops-task-manager:latest"
-                if errorlevel 1 (
-                    echo DOCKER RUN FAILED
-                    exit /b 1
-                )
+                        if errorlevel 1 (
+                            echo DOCKER PULL FAILED
+                            exit /b 1
+                        )
 
-                echo ================================
-                echo DEPLOYMENT SUCCESSFUL
-                echo ================================
-            '''
+                        echo ================================
+                        echo Starting new container
+                        echo ================================
+
+                        ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "sudo docker run -d --restart unless-stopped --name devops-task-manager -p 80:80 %ECR_REPO%:latest"
+
+                        if errorlevel 1 (
+                            echo DOCKER RUN FAILED
+                            exit /b 1
+                        )
+
+                        echo ================================
+                        echo DEPLOYMENT SUCCESSFUL
+                        echo ================================
+                    '''
+                }
+            }
         }
-    }
-}
     }
 }
