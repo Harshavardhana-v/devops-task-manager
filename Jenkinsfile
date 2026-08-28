@@ -62,14 +62,13 @@ pipeline {
             }
         }
 
-      stage('Get EC2 IP') {
+     stage('Get EC2 IP') {
     steps {
         script {
-          def ec2IP = bat(
+            env.EC2_IP = bat(
                 script: '@cd /d C:\\Terraform\\devops-infra && @terraform output -raw ec2_elastic_ip',
                 returnStdout: true
             ).trim()
-            env.EC2_IP=ec2Ip
 
             echo "EC2 Elastic IP: ${env.EC2_IP}"
         }
