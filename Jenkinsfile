@@ -105,6 +105,56 @@ pipeline {
             }
         }
 
+        stage('Ensure EC2 Running') {
+    steps {
+        withCredentials([
+            usernamePassword(
+                credentialsId: 'jenkins-ecr',
+                usernameVariable: 'AWS_ACCESS_KEY_ID',
+                passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+            )
+        ]) {
+            bat '''
+                echo ================================
+                echo Checking EC2 status
+                echo ================================
+
+                aws configure set aws_access_key_id "%AWS_ACCESS_KEY_ID%"
+                aws configure set aws_secret_access_key "%AWS_SECRET_ACCESS_KEY%"
+                aws configure set region "%AWS_REGION%"
+
+                for /f "delims=" %%i in ('aws ec2 describe-instances --filters "Name=tag:Name,Values=terraform-devops-server" "Name=instance-state-name,Values=stopped,running" --query "Reservations[0].Instances[0].InstanceId" --output text') do set EC2_ID=%%i
+
+                echo EC2 Instance ID: %EC2_ID%
+
+                if "%EC2_ID%"=="None" (
+                    echo EC2 INSTANCE NOT FOUND
+                    exit /b 1
+                )
+
+                for /f "delims=" %%i in ('aws ec2 describe-instances --instance-ids %EC2_ID% --query "Reservations[0].Instances[0].State.Name" --output text') do set EC2_STATE=%%i
+
+                echo EC2 State: %EC2_STATE%
+
+                if "%EC2_STATE%"=="stopped" (
+                    echo EC2 is stopped. Starting instance...
+                    aws ec2 start-instances --instance-ids %EC2_ID%
+                    
+                    if errorlevel 1 (
+                        echo FAILED TO START EC2
+                        exit /b 1
+                    )
+
+                    echo Waiting for EC2 to become running...
+                    aws ec2 wait instance-running --instance-ids %EC2_ID%
+                )
+
+                echo EC2 IS RUNNING
+            '''
+        }
+    }
+}
+
         stage('Get EC2 IP') {
             steps {
                 withCredentials([
