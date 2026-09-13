@@ -1,0 +1,9 @@
+services:
+
+  web:
+    ports:
+     - "8081:80"
+
+  backend:
+    environment:
+      NODE_ENV: development

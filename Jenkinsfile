@@ -5,6 +5,7 @@ pipeline {
     environment {
         AWS_REGION = 'ap-south-1'
         ECR_REPO   = '351395891043.dkr.ecr.ap-south-1.amazonaws.com/devops-task-manager'
+        IMAGE_TAG  = 'build-${BUILD_NUMBER}'
     }
 
     stages {
@@ -58,7 +59,7 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                bat 'docker build --provenance=false --sbom=false -t %ECR_REPO%:latest .'
+                bat 'docker build --provenance=false --sbom=false -t %ECR_REPO%:%IMAGE_TAG% .'
             }
         }
 
@@ -92,7 +93,7 @@ pipeline {
                         echo Pushing Docker image to ECR
                         echo ================================
 
-                        docker push "%ECR_REPO%:latest"
+                        docker push "%ECR_REPO%:%IMAGE_TAG%"
 
                         if errorlevel 1 (
                             echo ECR PUSH FAILED
@@ -251,7 +252,7 @@ pipeline {
                         echo Pulling latest image
                         echo ================================
 
-                        ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "sudo docker pull %ECR_REPO%:latest"
+                        ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "sudo docker pull %ECR_REPO%:%IMAGE_TAG%"
 
                         if errorlevel 1 (
                             echo DOCKER PULL FAILED
@@ -262,7 +263,7 @@ pipeline {
                         echo Starting new container
                         echo ================================
 
-                        ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "sudo docker run -d --restart unless-stopped --name devops-task-manager -p 80:80 %ECR_REPO%:latest"
+                        ssh -i "%KEYFILE%" -o StrictHostKeyChecking=no ubuntu@%EC2_IP% "sudo docker run -d --restart unless-stopped --name devops-task-manager -p 80:80 %ECR_REPO%:%IMAGE_TAG%"
 
                         if errorlevel 1 (
                             echo DOCKER RUN FAILED
